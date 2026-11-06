@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 900" width="1040" height="900" font-family="Segoe UI, Arial, Helvetica, sans-serif">
+  <title>ESP32 Modbus emulator wiring</title>
+  <desc>ESP32 dev board wiring: 5 V power, serial port 1 on UART2 (GPIO17 and GPIO16) through MAX3232 channel 1, serial port 2 on UART1 (GPIO18 and GPIO19) through MAX3232 channel 2, both to off-page RS-232 devices, TX and RX activity LEDs on GPIO25 and GPIO26, and a WiFi status LED on GPIO27.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="context-stroke"/>
+    </marker>
+    <style>
+      .box { fill: #f8fafc; stroke: #334155; stroke-width: 2; }
+      .blackbox { fill: #1f2937; stroke: #111827; stroke-width: 2; }
+      .offpage { fill: #fef3c7; stroke: #b45309; stroke-width: 1.5; }
+      .title { font-size: 15px; font-weight: 700; fill: #0f172a; }
+      .sub { font-size: 12px; fill: #475569; }
+      .pin { font-size: 13px; font-weight: 600; fill: #0f172a; }
+      .wire-label { font-size: 12px; fill: #475569; }
+      .bb-title { font-size: 15px; font-weight: 700; fill: #f8fafc; }
+      .bb-sub { font-size: 12px; fill: #cbd5e1; }
+      .bb-pin { font-size: 12px; font-weight: 600; fill: #f8fafc; }
+      .off { font-size: 12px; font-weight: 600; fill: #78350f; }
+      .note { font-size: 13px; fill: #1e293b; }
+      .note-title { font-size: 14px; font-weight: 700; fill: #0f172a; }
+      .w { fill: none; stroke-width: 2.5; stroke-linejoin: round; }
+      .w5v { stroke: #dc2626; }
+      .w3v3 { stroke: #ea580c; }
+      .wgnd { stroke: #111827; }
+      .wtx { stroke: #2563eb; }
+      .wrx { stroke: #16a34a; }
+      .wtx2 { stroke: #7c3aed; }
+      .wrx2 { stroke: #0891b2; }
+      .wwifi { stroke: #d97706; }
+    </style>
+  </defs>
+
+  <rect width="1040" height="900" fill="#ffffff"/>
+
+  <text x="30" y="36" font-size="20" font-weight="700" fill="#0f172a">ESP32 Modbus emulator wiring</text>
+  <text x="30" y="58" class="sub">ESP32 and MAX3232 side only. The RS-232 devices on each port are off the page.</text>
+
+  <!-- Power sources -->
+  <rect x="30" y="130" width="170" height="100" rx="6" class="box"/>
+  <text x="44" y="166" class="title">5 V supply</text>
+  <text x="44" y="186" class="sub">at least 500 mA</text>
+  <text x="188" y="194" text-anchor="end" class="pin">+5 V</text>
+  <text x="188" y="226" text-anchor="end" class="pin">GND</text>
+
+  <rect x="30" y="290" width="170" height="70" rx="6" class="box"/>
+  <text x="115" y="319" text-anchor="middle" class="title">PC USB</text>
+  <text x="115" y="339" text-anchor="middle" class="sub">flashing and logs (UART0)</text>
+
+  <!-- Dev board -->
+  <rect x="290" y="90" width="270" height="530" rx="10" class="box"/>
+  <text x="425" y="122" text-anchor="middle" class="title">ESP32-WROOM-32E</text>
+  <text x="425" y="141" text-anchor="middle" class="sub">dev board</text>
+
+  <!-- Board pins, left -->
+  <text x="302" y="194" class="pin">5V</text>
+  <text x="302" y="226" class="pin">GND</text>
+  <text x="302" y="330" class="pin">USB port</text>
+  <circle cx="290" cy="189" r="4" fill="#dc2626"/>
+  <circle cx="290" cy="221" r="4" fill="#111827"/>
+
+  <!-- Board pins, right -->
+  <text x="548" y="194" text-anchor="end" class="pin">3V3</text>
+  <text x="548" y="226" text-anchor="end" class="pin">GND</text>
+  <text x="548" y="274" text-anchor="end" class="pin">GPIO17 (UART2 TX)</text>
+  <text x="548" y="314" text-anchor="end" class="pin">GPIO16 (UART2 RX)</text>
+  <text x="548" y="354" text-anchor="end" class="pin">GPIO18 (UART1 TX)</text>
+  <text x="548" y="394" text-anchor="end" class="pin">GPIO19 (UART1 RX)</text>
+  <text x="548" y="474" text-anchor="end" class="pin">GPIO25 (TX LED)</text>
+  <text x="548" y="534" text-anchor="end" class="pin">GPIO26 (RX LED)</text>
+  <text x="548" y="594" text-anchor="end" class="pin">GPIO27 (WiFi LED)</text>
+
+  <!-- Power wiring -->
+  <path class="w w5v" d="M200 189 H290"/>
+  <path class="w wgnd" d="M200 221 H290"/>
+  <path class="w" stroke="#64748b" d="M200 325 H290" stroke-dasharray="7 5"/>
+
+  <!-- MAX3232 breakout -->
+  <rect x="660" y="150" width="170" height="262" rx="4" class="blackbox"/>
+  <text x="745" y="176" text-anchor="middle" class="bb-title">MAX3232 breakout</text>
+  <text x="745" y="194" text-anchor="middle" class="bb-sub">both channels in use</text>
+  <text x="670" y="218" class="bb-pin">VCC</text>
+  <text x="670" y="238" class="bb-pin">GND</text>
+  <text x="670" y="274" class="bb-pin">T1IN</text>
+  <text x="670" y="314" class="bb-pin">R1OUT</text>
+  <text x="670" y="354" class="bb-pin">T2IN</text>
+  <text x="670" y="394" class="bb-pin">R2OUT</text>
+  <text x="820" y="238" text-anchor="end" class="bb-pin">GND</text>
+  <text x="820" y="274" text-anchor="end" class="bb-pin">T1OUT</text>
+  <text x="820" y="314" text-anchor="end" class="bb-pin">R1IN</text>
+  <text x="820" y="354" text-anchor="end" class="bb-pin">T2OUT</text>
+  <text x="820" y="394" text-anchor="end" class="bb-pin">R2IN</text>
+
+  <!-- MAX3232 power and serial wiring -->
+  <path class="w w3v3" d="M560 189 H615 V213 H660"/>
+  <path class="w wgnd" d="M560 221 H600 V233 H660"/>
+  <path class="w wtx" marker-end="url(#arrow)" d="M560 269 H660"/>
+  <path class="w wrx" marker-end="url(#arrow)" d="M660 309 H560"/>
+  <path class="w wtx2" marker-end="url(#arrow)" d="M560 349 H660"/>
+  <path class="w wrx2" marker-end="url(#arrow)" d="M660 389 H560"/>
+  <text x="610" y="262" text-anchor="middle" class="wire-label">Port 1 TX</text>
+  <text x="610" y="302" text-anchor="middle" class="wire-label">Port 1 RX</text>
+  <text x="610" y="342" text-anchor="middle" class="wire-label">Port 2 TX</text>
+  <text x="610" y="382" text-anchor="middle" class="wire-label">Port 2 RX</text>
+
+  <!-- Off-page connectors -->
+  <path class="w wgnd" d="M830 233 H880"/>
+  <path class="w wtx" marker-end="url(#arrow)" d="M830 269 H880"/>
+  <path class="w wrx" marker-end="url(#arrow)" d="M880 309 H830"/>
+  <path class="w wtx2" marker-end="url(#arrow)" d="M830 349 H880"/>
+  <path class="w wrx2" marker-end="url(#arrow)" d="M880 389 H830"/>
+  <path class="offpage" d="M882 217 H990 L1012 233 L990 249 H882 z"/>
+  <text x="892" y="237" class="off">Device grounds</text>
+  <path class="offpage" d="M882 253 H990 L1012 269 L990 285 H882 z"/>
+  <text x="892" y="273" class="off">To port 1 RX</text>
+  <path class="offpage" d="M882 309 L904 293 H1012 V325 H904 z"/>
+  <text x="914" y="313" class="off">From port 1 TX</text>
+  <path class="offpage" d="M882 333 H990 L1012 349 L990 365 H882 z"/>
+  <text x="892" y="353" class="off">To port 2 RX</text>
+  <path class="offpage" d="M882 389 L904 373 H1012 V405 H904 z"/>
+  <text x="914" y="393" class="off">From port 2 TX</text>
+  <text x="882" y="428" class="wire-label">RS-232 levels. For an</text>
+  <text x="882" y="444" class="wire-label">RS-485 device, add an</text>
+  <text x="882" y="460" class="wire-label">RS-485/RS-232 converter.</text>
+
+  <!-- TX LED -->
+  <path class="w wtx" d="M560 469 H640"/>
+  <rect x="640" y="457" width="70" height="24" rx="2" fill="#fff" stroke="#334155" stroke-width="2"/>
+  <text x="675" y="474" text-anchor="middle" class="pin">330 Ω</text>
+  <path class="w wtx" d="M710 469 H770"/>
+  <path d="M770 455 V483 L796 469 z" fill="#2563eb" stroke="#1e3a8a" stroke-width="1.5"/>
+  <path d="M797 454 V484" stroke="#1e3a8a" stroke-width="3"/>
+  <path d="M790 446 L802 434 M803 450 L815 438" stroke="#2563eb" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="826" y="461" class="wire-label">TX LED</text>
+  <path class="w wgnd" d="M797 469 H880 V620"/>
+
+  <!-- RX LED -->
+  <path class="w wrx" d="M560 529 H640"/>
+  <rect x="640" y="517" width="70" height="24" rx="2" fill="#fff" stroke="#334155" stroke-width="2"/>
+  <text x="675" y="534" text-anchor="middle" class="pin">330 Ω</text>
+  <path class="w wrx" d="M710 529 H770"/>
+  <path d="M770 515 V543 L796 529 z" fill="#16a34a" stroke="#14532d" stroke-width="1.5"/>
+  <path d="M797 514 V544" stroke="#14532d" stroke-width="3"/>
+  <path d="M790 506 L802 494 M803 510 L815 498" stroke="#16a34a" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="826" y="521" class="wire-label">RX LED</text>
+  <path class="w wgnd" d="M797 529 H880"/>
+  <circle cx="880" cy="529" r="4" fill="#111827"/>
+
+  <!-- WiFi LED -->
+  <path class="w wwifi" d="M560 589 H640"/>
+  <rect x="640" y="577" width="70" height="24" rx="2" fill="#fff" stroke="#334155" stroke-width="2"/>
+  <text x="675" y="594" text-anchor="middle" class="pin">330 Ω</text>
+  <path class="w wwifi" d="M710 589 H770"/>
+  <path d="M770 575 V603 L796 589 z" fill="#d97706" stroke="#78350f" stroke-width="1.5"/>
+  <path d="M797 574 V604" stroke="#78350f" stroke-width="3"/>
+  <path d="M790 566 L802 554 M803 570 L815 558" stroke="#d97706" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="826" y="581" class="wire-label">WiFi LED</text>
+  <path class="w wgnd" d="M797 589 H880"/>
+  <circle cx="880" cy="589" r="4" fill="#111827"/>
+
+  <!-- LED ground symbol -->
+  <path d="M862 620 H898 M869 627 H891 M876 634 H884" stroke="#111827" stroke-width="2.5"/>
+  <text x="908" y="628" class="pin">Board GND</text>
+
+  <!-- Notes -->
+  <rect x="30" y="648" width="980" height="234" rx="6" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="48" y="674" class="note-title">Before powering up</text>
+  <text x="48" y="698" class="note">1. Connect RS-232 lines only to the MAX3232, never to a GPIO. RS-232 voltages can damage the ESP32.</text>
+  <text x="48" y="720" class="note">2. Power the MAX3232 from 3V3. It accepts up to 5.5 V, but R1OUT and R2OUT follow VCC and the ESP32 has 3.3 V inputs.</text>
+  <text x="48" y="742" class="note">3. Port 1 is the Modbus RTU slave port. Port 2 is reserved for the planned master mode: the firmware doesn't drive it yet,</text>
+  <text x="64" y="760" class="note">so until then pull T2IN up to 3V3 with 10 kΩ, unless the breakout already does.</text>
+  <text x="48" y="782" class="note">4. The ESP32, the MAX3232 and the devices on both ports must share a common ground.</text>
+  <text x="48" y="804" class="note">5. Idle readings with the emulator running: T1OUT about -5.6 V, R1OUT 3.3 V. The TX and RX LEDs show port 1 traffic.</text>
+  <text x="48" y="826" class="note">6. Power the board from the 5 V supply or USB. If using both while flashing, check your board can take it.</text>
+  <text x="48" y="848" class="note">7. Pin labels vary by board: GPIO17 and GPIO16 may be marked TX2 and RX2, or just 17 and 16.</text>
+  <text x="48" y="870" class="note">8. WiFi LED: slow blink while connecting, solid when connected, double flash for a fault.</text>
+</svg>

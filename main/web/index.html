@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modbus Emulator</title>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--text:#1f2937;--muted:#6b7280;--line:#e5e7eb;--accent:#b91c1c;--good:#15803d;--bad:#b91c1c;--field:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#111318;--card:#1b1e25;--text:#e5e7eb;--muted:#9ca3af;--line:#2d323c;--accent:#f87171;--good:#4ade80;--bad:#f87171;--field:#14161c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:baseline;padding:16px;max-width:1100px;margin:0 auto}
+h1{font-size:20px;margin:0}
+#summary{color:var(--muted);font-size:13px}
+main{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));padding:0 16px 24px;max-width:1100px;margin:0 auto}
+section{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0}
+.wide{grid-column:1/-1}
+h2{font-size:15px;margin:0 0 12px}
+form{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));align-items:end}
+label{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+input,select{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:5px;background:var(--field);color:var(--text);font:inherit}
+button{padding:8px 12px;border:1px solid var(--accent);border-radius:5px;background:var(--accent);color:var(--card);font:inherit;font-weight:600;cursor:pointer}
+button.quiet{background:none;color:var(--accent)}
+.buttons{display:flex;flex-wrap:wrap;gap:8px;grid-column:1/-1}
+.note{color:var(--muted);font-size:12px;margin:10px 0 0}
+.span-all{grid-column:1/-1;margin:0}
+#message{flex-basis:100%;min-height:20px;font-size:13px;margin:0}
+#message.error{color:var(--bad)}
+#message.ok{color:var(--good)}
+.scroll{max-height:440px;overflow:auto;margin-top:14px;border:1px solid var(--line);border-radius:5px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{position:sticky;top:0;background:var(--card);text-align:left;color:var(--muted);font-weight:600}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td.num{font-variant-numeric:tabular-nums;font-family:ui-monospace,Consolas,monospace}
+tbody.pick tr{cursor:pointer}
+tbody.pick tr:hover{background:var(--bg)}
+.scroll.short{max-height:260px}
+#mode-form{grid-template-columns:minmax(0,340px) auto;justify-content:start}
+#mode-form .buttons{grid-column:auto}
+.muted{color:var(--muted)}
+td button{padding:3px 8px;font-size:12px}
+.counters{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:0}
+.counters div{display:grid}
+.counters dt{font-size:12px;color:var(--muted)}
+.counters dd{margin:0;font-size:18px;font-variant-numeric:tabular-nums}
+.warn{color:var(--bad)}
+pre{margin:12px 0 0;padding:10px;max-height:440px;overflow:auto;border:1px solid var(--line);border-radius:5px;background:var(--field);font:12px/1.5 ui-monospace,Consolas,monospace;white-space:pre}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>Modbus Emulator</h1>
+  <span id="summary">Connecting...</span>
+  <p id="message" role="status"></p>
+</header>
+<main>
+  <section>
+    <h2>Serial</h2>
+    <form id="serial-form">
+      <label>Baud rate<input id="baud" type="number" min="1200" max="921600" list="bauds" required></label>
+      <datalist id="bauds"><option value="9600"><option value="19200"><option value="38400"><option value="56000"><option value="57600"><option value="115200"></datalist>
+      <label>Parity<select id="parity"><option value="N">None</option><option value="E">Even</option><option value="O">Odd</option></select></label>
+      <label>Stop bits<select id="stop"><option value="1">1</option><option value="2">2</option></select></label>
+      <label>Slave ID<input id="slave" type="number" min="1" max="247" required></label>
+      <div class="buttons"><button type="submit">Apply serial</button></div>
+    </form>
+  </section>
+  <section>
+    <h2>WiFi</h2>
+    <form id="wifi-form">
+      <label>Network<input id="ssid" maxlength="32" required></label>
+      <label>Password<input id="wifi-pass" type="password" maxlength="63" autocomplete="off"></label>
+      <div class="buttons"><button type="submit">Connect</button></div>
+    </form>
+    <p class="note" id="wifi-state"></p>
+  </section>
+  <section class="wide">
+    <h2>Memory map</h2>
+    <form id="mode-form">
+      <label>Address mode<select id="addr-mode"><option value="open">Open: every address answers</option><option value="strict">Strict: only blocks answer</option></select></label>
+      <div class="buttons"><button type="submit">Apply mode</button></div>
+    </form>
+    <p class="note" id="mode-note"></p>
+    <p class="note" id="capacity"></p>
+    <form id="block-form">
+      <label>Table<select id="block-kind"><option value="0">0x Coils (FC01)</option><option value="1">1x Discrete inputs (FC02)</option><option value="3" selected>3x Input registers (FC04)</option><option value="4">4x Holding registers (FC03)</option></select></label>
+      <label>First address<input id="block-first" type="number" min="1" max="65536" required></label>
+      <label>Count<input id="block-count" type="number" min="1" max="65536" required></label>
+      <label>Access<select id="block-access"><option value="0">Read/write</option><option value="1">Read-only</option></select></label>
+      <div class="buttons">
+        <button type="submit">Add block</button>
+        <button type="button" class="quiet" id="reset">Reset to defaults</button>
+      </div>
+    </form>
+    <p class="note">A block gives a range of addresses storage. Blocks marked auto were added for a rule in open mode. Read-only will reject master writes once writes are supported.</p>
+    <div class="scroll short">
+      <table>
+        <thead><tr><th>Table</th><th>Addresses</th><th>Count</th><th>Access</th><th></th></tr></thead>
+        <tbody id="blocks"></tbody>
+      </table>
+    </div>
+  </section>
+  <section class="wide">
+    <h2>Rules</h2>
+    <form id="rule-form">
+      <label>Table<select id="kind"><option value="0">0x Coils (FC01)</option><option value="1">1x Discrete inputs (FC02)</option><option value="3" selected>3x Input registers (FC04)</option><option value="4">4x Holding registers (FC03)</option></select></label>
+      <label>First address<input id="first" type="number" min="1" max="65536" required></label>
+      <label>Count (values)<input id="count" type="number" min="1" max="65536" required></label>
+      <label data-regs>Data type<select id="type"><option value="0">UINT16</option><option value="1">INT16</option><option value="2">UINT32</option><option value="3">INT32</option><option value="4">FLOAT32 / REAL</option><option value="5">FLOAT64</option></select></label>
+      <label data-regs>Byte order<select id="order"><option value="0">ABCD (big-endian)</option><option value="1">CDAB (word swap)</option><option value="2">BADC (byte swap)</option><option value="3">DCBA (little-endian)</option></select></label>
+      <label>Mode<select id="mode"><option value="0">Static</option><option value="1">Random</option><option value="2" data-regs>Sine wave</option><option value="3">Square wave</option></select></label>
+      <label data-mode="0">Value<input id="value" type="number" step="any"></label>
+      <label data-mode="0" data-regs>Step per value<input id="value-step" type="number" step="any"></label>
+      <label data-mode="1 2 3" data-regs>Min<input id="min" type="number" step="any"></label>
+      <label data-mode="1 2 3" data-regs>Max<input id="max" type="number" step="any"></label>
+      <label data-mode="1">New value every (s)<input id="interval" type="number" min="0.1" step="0.1"></label>
+      <label data-mode="2 3">Period (s)<input id="period" type="number" min="0.1" step="0.1"></label>
+      <label data-mode="3">On for (% of period)<input id="duty" type="number" min="0" max="100"></label>
+      <label data-mode="2 3">Phase (deg)<input id="phase" type="number" min="0" max="359"></label>
+      <label data-mode="2 3">Phase step per value<input id="step" type="number" min="-360" max="360"></label>
+      <p class="note span-all" id="span"></p>
+      <div class="buttons">
+        <button type="submit">Apply rule</button>
+        <button type="button" class="quiet" id="clear-rules">Clear rules in range</button>
+      </div>
+    </form>
+    <p class="note">A rule drives a range of values. In open mode, applying one adds storage for it automatically. In strict mode, it must sit inside blocks. Addresses without a rule keep their value. Static values are set once, while random, sine and square values update continuously. Addresses omit the 0x, 1x, 3x or 4x prefix: 3001 is wire address 3000. Click a rule to load it.</p>
+    <div class="scroll short">
+      <table>
+        <thead><tr><th>Table</th><th>Addresses</th><th>Type</th><th>Mode</th><th>Settings</th></tr></thead>
+        <tbody id="rules" class="pick"></tbody>
+      </table>
+    </div>
+  </section>
+  <section class="wide">
+    <h2>Values</h2>
+    <form id="view-form">
+      <label>Table<select id="view-kind"><option value="0">0x Coils (FC01)</option><option value="1">1x Discrete inputs (FC02)</option><option value="3" selected>3x Input registers (FC04)</option><option value="4">4x Holding registers (FC03)</option></select></label>
+      <label>First address<input id="view-first" type="number" min="1" max="65536" required></label>
+      <div class="buttons">
+        <button type="submit">Show</button>
+        <button type="button" class="quiet" id="view-prev">Previous 50</button>
+        <button type="button" class="quiet" id="view-next">Next 50</button>
+      </div>
+    </form>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Address</th><th>Wire address</th><th>Raw</th><th>Value</th><th>Rule</th></tr></thead>
+        <tbody id="values"></tbody>
+      </table>
+    </div>
+  </section>
+  <section class="wide">
+    <h2>Diagnostics</h2>
+    <dl class="counters" id="counters"></dl>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Age</th><th>Function</th><th>Wire address</th><th>Quantity</th><th>Registers</th><th>Result</th></tr></thead>
+        <tbody id="recent"></tbody>
+      </table>
+    </div>
+    <p class="note">Parity or framing errors climbing while requests stay at zero usually means a baud or format mismatch. Exception 02 means the master read a register that is not defined.</p>
+  </section>
+  <section class="wide">
+    <h2>Raw frames</h2>
+    <div class="buttons">
+      <button type="button" id="freeze">Freeze</button>
+      <button type="button" class="quiet" id="clear-stats">Clear counters and frames</button>
+    </div>
+    <pre id="frames">No frames yet</pre>
+    <p class="note">Last 32 frames, oldest first: time since the previous frame, direction, length, flags, then bytes in hex. CRC OK means the bytes pass the check, whatever the UART flagged. Freeze to select and copy.</p>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const MODES = ['Static', 'Random', 'Sine', 'Square'];
+// Index matches map_type_t
+const TYPES = [
+  {name: 'UINT16', words: 1, read: (view) => view.getUint16(0)},
+  {name: 'INT16', words: 1, read: (view) => view.getInt16(0)},
+  {name: 'UINT32', words: 2, read: (view) => view.getUint32(0)},
+  {name: 'INT32', words: 2, read: (view) => view.getInt32(0)},
+  {name: 'FLOAT32', words: 2, read: (view) => Number(view.getFloat32(0).toPrecision(7))},
+  {name: 'FLOAT64', words: 4, read: (view) => view.getFloat64(0)},
+  {name: 'BOOL', words: 1, read: (view) => view.getUint16(0)},
+];
+const TYPE_BOOL = 6;
+const ORDERS = ['ABCD', 'CDAB', 'BADC', 'DCBA'];
+const KIND_NAMES = {0: '0x Coils', 1: '1x Discrete inputs', 3: '3x Input registers', 4: '4x Holding registers'};
+// Rule rows from /api/map
+const R = {kind: 0, start: 1, count: 2, type: 3, order: 4, mode: 5, value: 6, valueStep: 7,
+  min: 8, max: 9, period: 10, phase: 11, phaseStep: 12, duty: 13};
+const PAGE = 50;
+const COUNTERS = [['rx_frames', 'Requests'], ['tx_frames', 'Replies'], ['exceptions', 'Exceptions'],
+  ['crc_errors', 'Bad CRC'], ['parity_errors', 'Parity errors'], ['framing_errors', 'Framing errors'],
+  ['breaks', 'Breaks'], ['overruns', 'Overruns'], ['other_slave', 'Other slave']];
+const FC_PREFIX = {1: '0x', 2: '1x', 3: '4x', 4: '3x'};
+const FLAG_TX = 0x01;
+const FLAG_NAMES = [[0x02, 'PARITY'], [0x04, 'FRAMING'], [0x08, 'BREAK'], [0x10, 'OVERRUN'], [0x20, 'CRC OK']];
+const EXCEPTIONS = {1: 'Illegal function', 2: 'Illegal address', 3: 'Illegal value'};
+let password = '';
+let map = {blocks: [], rules: [], capacity: {}};
+let formsFilled = false;
+let frozen = false;
+let viewKind = 3;
+let viewStart = 3000;
+let polls = 0;
+
+const isBits = kind => kind === 0 || kind === 1;
+const label = (kind, addr) => `${kind}x${addr + 1}`;
+const range = (kind, start, count) => count === 1 ? label(kind, start) : `${label(kind, start)} to ${start + count}`;
+const hex = word => word.toString(16).toUpperCase().padStart(4, '0');
+
+function say(text, ok) {
+  $('message').textContent = text;
+  $('message').className = ok ? 'ok' : 'error';
+}
+
+async function post(path, body) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const reply = await fetch(path, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Emu-Password': '=' + password},
+      body: JSON.stringify(body || {}),
+    });
+    if (reply.status === 401 && attempt === 0) {
+      const entered = prompt('Password for changes');
+      if (entered === null) break;
+      password = entered;
+      continue;
+    }
+    const data = await reply.json().catch(() => ({}));
+    if (!reply.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+  throw new Error('Wrong password');
+}
+
+async function run(action, done) {
+  try {
+    await action();
+    say(done, true);
+    await refreshMap();
+    await refreshValues();
+    await refreshStatus();
+  } catch (error) {
+    say(error.message, false);
+  }
+}
+
+function addCell(tr, text, cls) {
+  const td = tr.insertCell();
+  td.textContent = text;
+  if (cls) td.className = cls;
+  return td;
+}
+
+// ---- Memory map
+
+function renderCapacity() {
+  const c = map.capacity;
+  $('capacity').textContent = `Registers ${c.regs_used} of ${c.regs_max} used, bits ${c.bits_used} of ${c.bits_max}, ` +
+    `blocks ${c.blocks} of ${c.blocks_max}, rules ${c.rules} of ${c.rules_max}.`;
+}
+
+function renderBlocks() {
+  const body = $('blocks');
+  body.textContent = '';
+  for (const [kind, start, count, flags] of map.blocks) {
+    const tr = body.insertRow();
+    addCell(tr, KIND_NAMES[kind]);
+    addCell(tr, range(kind, start, count), 'num');
+    addCell(tr, count, 'num');
+    addCell(tr, (flags & 1 ? 'Read-only' : 'Read/write') + (flags & 2 ? ', auto' : ''));
+    const button = document.createElement('button');
+    button.className = 'quiet';
+    button.textContent = 'Delete';
+    button.onclick = () => {
+      if (confirm(`Delete ${range(kind, start, count)}, with its rules?`)) {
+        run(() => post('/api/blocks/delete', {kind, addr: start}), 'Block deleted');
+      }
+    };
+    tr.insertCell().append(button);
+  }
+}
+
+// ---- Rules
+
+function ruleSettings(rule) {
+  const seconds = rule[R.period] / 1000;
+  const bits = isBits(rule[R.kind]);
+  const phase = rule[R.phaseStep] ? `, ${rule[R.phase]}° plus ${rule[R.phaseStep]}° each` : rule[R.phase] ? `, ${rule[R.phase]}°` : '';
+  switch (rule[R.mode]) {
+    case 0:
+      if (bits) return rule[R.value] ? 'On' : 'Off';
+      return rule[R.valueStep] ? `${rule[R.value]}, then ${rule[R.valueStep] > 0 ? '+' : ''}${rule[R.valueStep]} each` : String(rule[R.value]);
+    case 1:
+      return bits ? `every ${seconds} s` : `${rule[R.min]} to ${rule[R.max]}, every ${seconds} s`;
+    case 2:
+      return `${rule[R.min]} to ${rule[R.max]}, ${seconds} s period${phase}`;
+    default:
+      return (bits ? '' : `${rule[R.min]} or ${rule[R.max]}, `) + `on ${rule[R.duty]}% of ${seconds} s${phase}`;
+  }
+}
+
+function ruleTypeName(rule) {
+  const {name, words} = TYPES[rule[R.type]];
+  return words === 1 && rule[R.order] < 2 ? name : `${name} ${ORDERS[rule[R.order]]}`;
+}
+
+function renderRules() {
+  const body = $('rules');
+  body.textContent = '';
+  for (const rule of map.rules) {
+    const tr = body.insertRow();
+    const span = rule[R.count] * TYPES[rule[R.type]].words;
+    addCell(tr, KIND_NAMES[rule[R.kind]]);
+    addCell(tr, range(rule[R.kind], rule[R.start], span), 'num');
+    addCell(tr, `${ruleTypeName(rule)} × ${rule[R.count]}`);
+    addCell(tr, MODES[rule[R.mode]]);
+    addCell(tr, ruleSettings(rule));
+    tr.onclick = () => loadRule(rule);
+  }
+}
+
+function findRule(kind, addr) {
+  return map.rules.find(rule => rule[R.kind] === kind && addr >= rule[R.start] &&
+    addr < rule[R.start] + rule[R.count] * TYPES[rule[R.type]].words);
+}
+
+function syncRuleFields() {
+  const bits = isBits(+$('kind').value);
+  if (bits && $('mode').value === '2') $('mode').value = '0';
+  const mode = $('mode').value;
+  document.querySelectorAll('#rule-form [data-mode]').forEach(field => {
+    field.hidden = !field.dataset.mode.split(' ').includes(mode) || (bits && field.hasAttribute('data-regs'));
+  });
+  document.querySelectorAll('#rule-form label[data-regs]:not([data-mode]), #mode option[data-regs]').forEach(field => {
+    field.hidden = bits;
+  });
+  syncSpan();
+}
+
+function ruleWords() {
+  return isBits(+$('kind').value) ? 1 : TYPES[+$('type').value].words;
+}
+
+function syncSpan() {
+  const total = +$('count').value * ruleWords();
+  const first = +$('first').value;
+  const prefix = $('kind').value + 'x';
+  const unit = isBits(+$('kind').value) ? 'bit' : 'register';
+  $('span').textContent = total > 0
+    ? `Uses ${prefix}${first} to ${prefix}${first + total - 1} (${total} ${unit}${total === 1 ? '' : 's'})` : '';
+}
+
+function loadRule(rule) {
+  $('kind').value = rule[R.kind];
+  $('first').value = rule[R.start] + 1;
+  $('count').value = rule[R.count];
+  if (!isBits(rule[R.kind])) {
+    $('type').value = rule[R.type];
+    $('order').value = rule[R.order];
+  }
+  $('mode').value = rule[R.mode];
+  $('value').value = rule[R.value];
+  $('value-step').value = rule[R.valueStep];
+  $('min').value = rule[R.min];
+  $('max').value = rule[R.max];
+  $('interval').value = (rule[R.period] || 1000) / 1000;
+  $('period').value = (rule[R.period] || 10000) / 1000;
+  $('duty').value = rule[R.duty];
+  $('phase').value = rule[R.phase];
+  $('step').value = rule[R.phaseStep];
+  syncRuleFields();
+}
+
+function ruleTarget() {
+  return {kind: +$('kind').value, start: +$('first').value - 1, count: +$('count').value};
+}
+
+// ---- Values
+
+function valueText(kind, addr, raw, index) {
+  const rule = findRule(kind, addr);
+  if (raw[index] === null) return ['not defined', ''];
+  if (isBits(kind)) return [raw[index] ? 'On' : 'Off', rule ? MODES[rule[R.mode]] : ''];
+  if (!rule) return [String(raw[index]), ''];
+
+  const {words} = TYPES[rule[R.type]];
+  const offset = (addr - rule[R.start]) % words;
+  const summary = `${ruleTypeName(rule)} ${MODES[rule[R.mode]].toLowerCase()}`;
+  if (offset !== 0) return [`part of ${label(kind, addr - offset)}`, summary];
+
+  const value = raw.slice(index, index + words);
+  if (value.length < words || value.includes(null)) return ['', summary];
+  const view = new DataView(new ArrayBuffer(8));
+  const ordered = rule[R.order] & 1 ? [...value].reverse() : value;
+  ordered.forEach((word, i) => {
+    view.setUint16(i * 2, rule[R.order] & 2 ? (word << 8 | word >> 8) & 0xFFFF : word);
+  });
+  return [String(TYPES[rule[R.type]].read(view)), summary];
+}
+
+async function refreshValues() {
+  // A few extra registers, so a wide value at the end of the page still decodes
+  const count = Math.min(PAGE + 3, 0x10000 - viewStart);
+  const reply = await (await fetch(`/api/values?kind=${viewKind}&start=${viewStart}&count=${count}`)).json();
+  const raw = reply.values;
+  const body = $('values');
+  body.textContent = '';
+  for (let i = 0; i < Math.min(PAGE, count); i++) {
+    const addr = viewStart + i;
+    const tr = body.insertRow();
+    const [value, rule] = valueText(viewKind, addr, raw, i);
+    addCell(tr, label(viewKind, addr), 'num');
+    addCell(tr, addr, 'num');
+    addCell(tr, raw[i] === null ? '' : isBits(viewKind) ? raw[i] : hex(raw[i]), 'num');
+    addCell(tr, value, raw[i] === null ? 'muted' : 'num');
+    addCell(tr, rule);
+  }
+}
+
+function showPage(start) {
+  viewStart = Math.max(0, Math.min(0xFFFF, start));
+  $('view-first').value = viewStart + 1;
+  refreshValues().catch(error => say(error.message, false));
+}
+
+const MODE_NOTES = {
+  open: 'Open: every address in all four tables answers, reading 0 wherever nothing is stored. Mistakes in a master\'s addressing won\'t show up as errors, but the request log still shows every address read.',
+  strict: 'Strict: only the blocks below answer, and any other address gets exception 02, as from a real device. Use this to copy a manufacturer\'s published register map.',
+};
+
+async function refreshMap() {
+  map = await (await fetch('/api/map')).json();
+  const mode = map.strict ? 'strict' : 'open';
+  if (document.activeElement !== $('addr-mode')) $('addr-mode').value = mode;
+  $('mode-note').textContent = MODE_NOTES[mode];
+  renderCapacity();
+  renderBlocks();
+  renderRules();
+}
+
+// ---- Status
+
+function renderRecent(recent) {
+  const body = $('recent');
+  body.textContent = '';
+  for (const entry of recent) {
+    const tr = body.insertRow();
+    const prefix = FC_PREFIX[entry.fc];
+    const addresses = prefix && entry.qty
+      ? `${prefix}${entry.addr + 1} to ${prefix}${entry.addr + entry.qty}` : '';
+    const result = entry.exception
+      ? `Exception ${String(entry.exception).padStart(2, '0')}: ${EXCEPTIONS[entry.exception] || ''}` : 'OK';
+    [`${(entry.age_ms / 1000).toFixed(1)} s`, `FC${String(entry.fc).padStart(2, '0')}`,
+      entry.addr, entry.qty, addresses, result].forEach(text => {
+      tr.insertCell().textContent = text;
+    });
+    if (entry.exception) tr.className = 'warn';
+  }
+}
+
+function renderCounters(stats) {
+  const list = $('counters');
+  list.textContent = '';
+  for (const [key, name] of COUNTERS) {
+    const wrap = document.createElement('div');
+    const term = document.createElement('dt');
+    const value = document.createElement('dd');
+    term.textContent = name;
+    value.textContent = stats[key];
+    wrap.append(term, value);
+    list.append(wrap);
+  }
+}
+
+async function refreshStatus() {
+  const status = await (await fetch('/api/status')).json();
+  const {serial, wifi} = status;
+  $('summary').textContent = `${serial.baud} 8${serial.parity}${serial.stop_bits}, slave ${serial.slave_id}, up ${status.uptime_s} s`;
+  $('wifi-state').textContent = wifi.connected
+    ? `Connected to ${wifi.ssid} at ${wifi.ip}, ${wifi.rssi} dBm`
+    : wifi.ssid ? `Trying to reach ${wifi.ssid}` : 'No network configured';
+  if (wifi.setup_ap) $('wifi-state').textContent += '. Setup network active.';
+  renderCounters(status.stats);
+  renderRecent(status.recent);
+  if (!formsFilled) {
+    formsFilled = true;
+    $('baud').value = serial.baud;
+    $('parity').value = serial.parity;
+    $('stop').value = serial.stop_bits;
+    $('slave').value = serial.slave_id;
+    $('ssid').value = wifi.ssid;
+  }
+}
+
+function frameLine([time, length, flags, bytesHex], previous) {
+  const gap = previous ? `+${time - previous[0]} ms` : 'start';
+  const names = FLAG_NAMES.filter(([bit]) => flags & bit).map(([, name]) => name).join(' ');
+  const bytes = bytesHex.match(/../g)?.join(' ') ?? '';
+  const cut = length > bytesHex.length / 2 ? ` ...(${length} bytes)` : '';
+  return `${gap.padStart(10)}  ${flags & FLAG_TX ? 'TX' : 'RX'}  ${String(length).padStart(3)}  ${names.padEnd(22)}  ${bytes}${cut}`;
+}
+
+async function refreshFrames() {
+  if (frozen) return;
+  const frames = await (await fetch('/api/frames')).json();
+  $('frames').textContent = frames.length
+    ? frames.map((frame, i) => frameLine(frame, frames[i - 1])).join('\n') : 'No frames yet';
+}
+
+// ---- Wiring up
+
+$('kind').onchange = syncRuleFields;
+$('mode').onchange = syncRuleFields;
+['first', 'count', 'type'].forEach(id => { $(id).oninput = syncSpan; });
+
+$('block-form').onsubmit = event => {
+  event.preventDefault();
+  run(() => post('/api/blocks', {
+    kind: +$('block-kind').value, start: +$('block-first').value - 1,
+    count: +$('block-count').value, read_only: $('block-access').value === '1',
+  }), 'Block added');
+};
+
+$('mode-form').onsubmit = event => {
+  event.preventDefault();
+  const strict = $('addr-mode').value === 'strict';
+  if (strict && !confirm('Switch to strict mode? Masters reading outside the blocks will get exception 02.')) return;
+  run(() => post('/api/map/mode', {strict}), strict ? 'Strict mode on' : 'Open mode on');
+};
+
+$('reset').onclick = () => {
+  if (confirm('Replace the whole map with 3x3001 to 3x3100?')) {
+    run(() => post('/api/map/reset'), 'Defaults restored');
+  }
+};
+
+$('rule-form').onsubmit = event => {
+  event.preventDefault();
+  const kind = +$('kind').value;
+  const bits = isBits(kind);
+  const mode = +$('mode').value;
+  run(() => post('/api/rules', {
+    ...ruleTarget(), mode,
+    type: bits ? TYPE_BOOL : +$('type').value, order: bits ? 0 : +$('order').value,
+    value: +$('value').value, value_step: bits ? 0 : +$('value-step').value,
+    min: bits ? 0 : +$('min').value, max: bits ? 1 : +$('max').value,
+    period_ms: Math.round(+$(mode === 1 ? 'interval' : 'period').value * 1000),
+    duty_pct: +$('duty').value, phase_deg: +$('phase').value, phase_step_deg: +$('step').value,
+  }), 'Rule applied');
+};
+
+$('clear-rules').onclick = () => {
+  const target = ruleTarget();
+  target.count *= ruleWords();
+  if (confirm(`Clear rules from ${target.count} address(es) at ${label(target.kind, target.start)}? Values stay as they are.`)) {
+    run(() => post('/api/rules/clear', target), 'Rules cleared');
+  }
+};
+
+$('view-form').onsubmit = event => {
+  event.preventDefault();
+  viewKind = +$('view-kind').value;
+  showPage(+$('view-first').value - 1);
+};
+$('view-prev').onclick = () => showPage(viewStart - PAGE);
+$('view-next').onclick = () => showPage(viewStart + PAGE);
+
+$('freeze').onclick = () => {
+  frozen = !frozen;
+  $('freeze').textContent = frozen ? 'Resume' : 'Freeze';
+};
+
+$('clear-stats').onclick = () => run(() => post('/api/stats/reset'), 'Counters and frames cleared');
+
+$('serial-form').onsubmit = event => {
+  event.preventDefault();
+  run(() => post('/api/serial', {
+    baud: +$('baud').value, parity: $('parity').value,
+    stop_bits: +$('stop').value, slave_id: +$('slave').value,
+  }), 'Serial settings applied');
+};
+
+$('wifi-form').onsubmit = event => {
+  event.preventDefault();
+  run(() => post('/api/wifi', {ssid: $('ssid').value, password: $('wifi-pass').value}),
+    'Saved. Connecting now: the address may change, see the serial log.');
+};
+
+async function poll() {
+  try {
+    // Only this page changes the map, so it's fetched rarely
+    if (polls++ % 10 === 0) await refreshMap();
+    await refreshValues();
+    await refreshStatus();
+    await refreshFrames();
+  } catch (error) {
+    $('summary').textContent = 'Device not responding';
+  }
+  setTimeout(poll, 1000);
+}
+
+$('block-first').value = 1;
+$('block-count').value = 100;
+$('first').value = 3001;
+$('count').value = 1;
+$('value').value = 0;
+$('value-step').value = 0;
+$('min').value = 0;
+$('max').value = 1000;
+$('interval').value = 1;
+$('period').value = 10;
+$('duty').value = 50;
+$('phase').value = 0;
+$('step').value = 0;
+$('view-kind').value = viewKind;
+$('view-first').value = viewStart + 1;
+syncRuleFields();
+poll();
+</script>
+</body>
+</html>
